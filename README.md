@@ -1,18 +1,26 @@
 
-# Kelime Sınıflandırıcı
+# Language Classifier
 
-Bu proje, verilen bir kelimenin hangi dilde olmaya daha yatkın olduğunu tahmin etmek için LSTM (long short term memory) denen derin öğrenme metodonu kullanıyor.
+Tries to predict which language a word belongs using LSTMs. 
 
-Veri olarak 100.000 adet, her iki dilden de 50.000 adet kelime kullanıldı.
+Dataset contains 100K words. 50K from each: Turkish and English. I haven't included accented letters in Turkish like `ü, ö, ı, ç, ş`, because most of the Turkish words have one of them so it'd make the prediction lot easier. Instead, I've used the most approximate standard Latin letter - like `o` for `ö`.
 
-Türkçe'ye özel karakterler olan ü, ö, ı, ç, ş gibi harfleri en yakın genel latin karşılığına çevirerek kullandım. Bunun yanında, İngilizce'de bu karakterler nispeten daha az olduğundan, İngilize kelimelerdeki x, w ve q karakterlerine dokunmadım.
+English X, Q and W (Turkish alphabet doesn't present them) weren't touched since their frequency amongst English words are low.
 
-## Kullanılan Modüller
+# Installing
 
-* Keras: YSA matematik modellemesi
-* Numpy: Veri işleme
-* Random: Listeleri karistirmak icin.
+* Clone the repository.
+* `cd language-classifier`
+* `pipenv install -r %% pipenv shell`
+* Then run language-classifier/classifier.py
 
+Requires Python 3.6+
+
+## Imports
+
+* Keras: Deep learning framework
+* Numpy: Data storing and manipulation
+* Random: Just to shuffle the dataset.
 
 ```python
 import numpy as np
@@ -22,16 +30,9 @@ from keras.layers import Dense, Activation, Dropout, LSTM
 from keras.optimizers import RMSprop
 ```
 
-## Veriyi Programa Aktarma
+## Exploring and Preparing the Data
 
-### Dosyadan Listeye
-
-Kelimeleri etiketleriyle birilkte data listesine ekliyorum.
-
-Sinif etiketlerini belirtmesi icin 0 ve 1 kullandim.
-
-Öğrenme sırasında verilerin sıralı düzen içinde verilmesi modelin optimizasyonunun kötü olmasına sebebiyet verebilir. Dolayısıyla listeyi karıştırmakta fayda var.
-
+Importing the dataset.
 
 ```python
 data = []
@@ -47,8 +48,7 @@ with open('english.txt') as textfile:
 random.shuffle(data)
 ```
 
-### Öncü Veri Taraması
-
+Exploring
 
 ```python
 words = [record[0] for record in data]
@@ -59,59 +59,45 @@ longest = sorted(words, key=len)[-1]
 maxlen = len(longest)
 word_count = len(data)
 
-# Turkce ve ingilizce.
 n_classes = 2
 
-print('Karakter havuzu: {}'.format(", ".join(char_pool)))
-print('En uzun kelime: {}'.format(longest))
-print('En uzun kelimenin uzunlugu: {}'.format(maxlen))
-print('Kelime adedi: {}'.format(word_count))
+print('Character pool: {}'.format(", ".join(char_pool)))
+print('Longest word: {}'.format(longest))
+print('Length of the longest word: {}'.format(maxlen))
+print('Data size: {} words.'.format(word_count))
 ```
 
-    Karakter havuzu: a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
-    En uzun kelime: trinitrophenylmethylnitramine
-    En uzun kelimenin uzunlugu: 29
-    Kelime adedi: 99957
+So the result is..
 
+```
+Character pool: a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
+Longest word: trinitrophenylmethylnitramine
+Length of the longest word: 29
+Data size: 99957
+```
 
-### Ön İşleme
-
-Tüm karakterlere bir index atıyorum (ve vice-versa).
-
+Tokenizing char-wise.
 
 ```python
 char_indices = dict((c, i) for i, c in enumerate(char_pool))
 indices_char = dict((i, c) for i, c in enumerate(char_pool))
 ```
 
-Kelime/Karakter tipindeki veriyi sayısal diziler şekline getiriyorum.
-
+Prepearing the training data. Basically creating a whole size 0 filled tensor, and then filling it with data as the data contains sequential one-hot arrays. Makes it easier for me.
 
 ```python
-# Her harf icin maxlen uzunlugunda 0'lar ile dolu bir vektor
-# Her kelime icin icinde o listelerin oldugu baska bir liste
-# Tum veriler icin de kelimelere ait listeleri barindiran ana bir liste
-# olusturacak sekilde 3 boyutlu bos bir dizi tanimlaniyor.
 x_data = np.zeros((word_count, maxlen, len(char_pool)), dtype=np.bool)
-
-# Toplam kelime sayisi ve cikti sayisina gore bir liste tanimlaniyor.
 y_data = np.zeros((word_count, n_classes))
 
-# [0, 0, ..., 0] seklinde olan karakter vektorundeki bir degeri karak-
-# terin index'ine gore 1 yapiyor. Dolayisiyla en sonunda elde bir ke-
-# lime icin sirayla dizilmis one-hot diziler kaliyor.
 for i_word, word in enumerate(words):
     for i_char, char in enumerate(word):
         x_data[i_word, i_char, char_indices[char]] = 1
 
-# [0, 0] olan etiket listesini duruma gore [0, 1] veya [1, 0] haline
-# getiriyor.
 for i_label, label in enumerate(labels):
     y_data[i_label, label] = 1
 ```
 
-## Modeli Yaratma
-
+## The Predictive Model
 
 ```python
 model = Sequential()
@@ -119,53 +105,59 @@ model.add(LSTM(16, input_shape=(maxlen, len(char_pool))))
 model.add(Dense(n_classes))
 model.add(Activation('softmax'))
 
-# geri donuslu yapay aglar icin genelde kullanilan optimizer
 optimizer = RMSprop(lr=0.01)
 
 model.compile(loss='categorical_crossentropy', optimizer=optimizer)
 ```
 
-## Ogrenim
-
+## Training
 
 ```python
 for iteration in range(3):
     model.fit(x_data, y_data, batch_size=128, nb_epoch=1)
-print('Ogrenim tamamlandi!')
 ```
 
-## Deneme!
-
+## Launch!
 
 ```python
 def predict(word):
-    '''Verilen kelimenin dillere gore aitlik olasiliklarini hesaplar.'''
     processed_word = np.zeros((1, maxlen, len(char_pool)))
     for i_char, char in enumerate(word):
         processed_word[0, i_char, char_indices[char]] = 1
     prediction = model.predict(processed_word, verbose=0)[0]
     
-    result = {'turk': prediction[0], 'ing': prediction[1]}
+    result = {'Turkish': prediction[0], 'English': prediction[1]}
 
     return result
 ```
 
+Throw any word you want inside this list. It'll be our playing dataset.
 
 ```python
-# [!] kelimelerin kucuk harflerle yazilmis olmasi gerekiyor.
+# [!] be sure they are all lower-case.
 word_list = [
+    # supposed to be Turkish
+    'altinvarak',
+    'bulutsuzluk',
+    'farmakoloji',
     'toprak',
-    'enginar',
-    'ornitorenk',
-    'frontier',
-    'television',
-    'facebook',
-    # anlamsiz kelimeler
+    'hanimeli',
+    'imkansiz',
+
+    # supposed to be English
+    'tensorflow',
+    'jabba',
+    'magsafe',
+    'pharmacology',
+    'parallax',
+    'wabby',
+    'querein',
+
+    # curiosity
+    'terminal', # an actual word in both languages
     'ahahahah',
-    'xtr',
-    'rabara',
-    'fizyoloji',
-    'physiology'
+    'ahahahahahahahah',
+    'rawr',
 ]
 
 for word in word_list:
@@ -173,20 +165,26 @@ for word in word_list:
     print('{}: {}'.format(word, prediction))
 ```
 
-    toprak: {'turk': 0.92372286, 'ing': 0.076277196}
-    enginar: {'turk': 0.28950188, 'ing': 0.71049809}
-    ornitorenk: {'turk': 0.025209611, 'ing': 0.97479033}
-    frontier: {'turk': 0.000279842, 'ing': 0.99972016}
-    television: {'turk': 0.00035036309, 'ing': 0.99964964}
-    facebook: {'turk': 0.00049878447, 'ing': 0.99950123}
-    ahahahah: {'turk': 0.98772639, 'ing': 0.012273617}
-    xtr: {'turk': 0.00017934592, 'ing': 0.99982065}
-    rabara: {'turk': 0.72516716, 'ing': 0.2748329}
-    fizyoloji: {'turk': 0.99369228, 'ing': 0.0063076839}
-    physiology: {'turk': 0.00017088205, 'ing': 0.99982905}
+## Results
 
+```
+altinvarak:	    TUR: 0.98	ENG: 0.02
+bulutsuzluk:    TUR: 0.99	ENG: 0.01
+farmakoloji:    TUR: 0.97	ENG: 0.03
+toprak:	        TUR: 0.90	ENG: 0.10
+hanimeli:	    TUR: 0.97	ENG: 0.03
+imkansiz:	    TUR: 0.99	ENG: 0.01
+tensorflow:	    TUR: 0.00	ENG: 1.00
+jabba:	        TUR: 0.75	ENG: 0.25
+magsafe:	    TUR: 0.59	ENG: 0.41
+pharmacology:   TUR: 0.00	ENG: 1.00
+parallax:	    TUR: 0.00	ENG: 1.00
+wabby:	        TUR: 0.00	ENG: 1.00
+querein:	    TUR: 0.00	ENG: 1.00
+terminal:	    TUR: 0.20	ENG: 0.80
+ahahahah:	    TUR: 0.83	ENG: 0.17
+ahahahahahahahah:TUR: 0.80	ENG: 0.20
+rawr:	        TUR: 0.00	ENG: 1.00
 
-# Sonuclar
-* x, q ve w gibi Ingilice'ye has karakterlerin varligini kavramis
-* Turkcede -loji, Ingilizce'de -logy gibi eklerin kelime siniflandirmasinda onemli yer tuttugunu anlamis.
-* Gülmek daha Türkçemsi bir eylemmiş...
+Overall Accuracy: 457/500 (91.4)
+```
