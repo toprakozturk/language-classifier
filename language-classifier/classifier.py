@@ -30,13 +30,12 @@ longest = sorted(words, key=len)[-1]
 maxlen = len(longest)
 word_count = len(data)
 
-# Turkce ve ingilizce.
 n_classes = 2
 
-print('Karakter havuzu: {}'.format(", ".join(char_pool)))
-print('En uzun kelime: {}'.format(longest))
-print('En uzun kelimenin uzunlugu: {}'.format(maxlen))
-print('Kelime adedi: {}'.format(word_count))
+print('Character pool: {}'.format(", ".join(char_pool)))
+print('Longest word: {}'.format(longest))
+print('Length of the longest word: {}'.format(maxlen))
+print('Data size: {} words.'.format(word_count))
 
 char_indices = dict((c, i) for i, c in enumerate(char_pool))
 indices_char = dict((i, c) for i, c in enumerate(char_pool))
@@ -64,13 +63,12 @@ for iteration in range(1):
     model.fit(x_data, y_data, batch_size=64, nb_epoch=1)
 
 def predict(word):
-    '''Verilen kelimenin dillere gore aitlik olasiliklarini hesaplar.'''
     processed_word = np.zeros((1, maxlen, len(char_pool)))
     for i_char, char in enumerate(word):
         processed_word[0, i_char, char_indices[char]] = 1
     prediction = model.predict(processed_word, verbose=0)[0]
 
-    result = {'turk': prediction[0], 'ing': prediction[1]}
+    result = {'tur': prediction[0], 'eng': prediction[1]}
 
     return result
 
@@ -78,14 +76,44 @@ correct_count = 0
 
 for word, label in zip(test_words, test_labels):
     prediction = predict(word)
-
-    pred = 0
-
-    if prediction["turk"] > prediction["ing"]:
+    if prediction["tur"] > prediction["eng"]:
         pred = 0
     else:
         pred = 1
 
     if pred == label:
         correct_count += 1
-print(f"Dogruluk oranı {correct_count}/500 = {correct_count/5}")
+
+word_list = [
+    # supposed to be Turkish
+    'altinvarak',
+    'bulutsuzluk',
+    'farmakoloji',
+    'toprak',
+    'hanimeli',
+    'imkansiz',
+
+    # supposed to be English
+    'tensorflow',
+    'jabba',
+    'magsafe',
+    'pharmacology',
+    'parallax',
+    'wabby',
+    'querein',
+
+    # curiosity
+    'terminal', # an actual word in both languages
+    'ahahahah',
+    'ahahahahahahahah',
+    'rawr',
+]
+
+for word in word_list:
+    prediction = predict(word)
+    print(f"{word}:\t"
+          f"TUR: {prediction['tur']:.2f}\t"
+          f"ENG: {prediction['eng']:.2f}")
+
+print(f"Overall Accuracy: {correct_count}/500 "
+      f"({correct_count/5})")
