@@ -16,6 +16,8 @@ English X, Q and W (Turkish alphabet doesn't present them) weren't touched since
 
 Requires Python 3.6+
 
+# Explanation
+
 ## Imports
 
 * Keras: Deep learning framework
