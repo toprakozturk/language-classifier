@@ -3,9 +3,11 @@ import random
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Dropout, LSTM
 from keras.optimizers import RMSprop
+import os
 
-data = []
+data = [] 
 
+#open and read all the words from the txt file
 with open('data/turkish.txt') as textfile:
     for word in textfile:
         data.append((word.replace('\n', ''), 0))
@@ -14,11 +16,14 @@ with open('data/english.txt') as textfile:
     for word in textfile:
         data.append((word.replace('\n', ''), 1))
 
+#Shuffle data to maintain homogenity
 random.shuffle(data)
 
+#Test train split data
 test = list(data[:500])
 data = list(data[500:])
 
+#Seperate labels and words from each other
 words = [record[0] for record in data]
 labels = [record[1] for record in data]
 
@@ -40,9 +45,12 @@ print('Data size: {} words.'.format(word_count))
 char_indices = dict((c, i) for i, c in enumerate(char_pool))
 indices_char = dict((i, c) for i, c in enumerate(char_pool))
 
+#Transform the data as required to one hot encodings
 x_data = np.zeros((word_count, maxlen, len(char_pool)), dtype=np.bool)
 y_data = np.zeros((word_count, n_classes))
 
+
+#Transforming training words to one hot encoding
 for i_word, word in enumerate(words):
     for i_char, char in enumerate(word):
         x_data[i_word, i_char, char_indices[char]] = 1
@@ -50,6 +58,7 @@ for i_word, word in enumerate(words):
 for i_label, label in enumerate(labels):
     y_data[i_label, label] = 1
 
+#Create the model and compile it.
 model = Sequential()
 model.add(LSTM(8, input_shape=(maxlen, len(char_pool))))
 model.add(Dense(n_classes))
@@ -59,8 +68,13 @@ optimizer = RMSprop(lr=0.01)
 
 model.compile(loss='categorical_crossentropy', optimizer=optimizer)
 
-for iteration in range(1):
+#save different model in Models for later use
+base= 'Models'
+for iteration in range(1): #You can tune iterations as per the required
     model.fit(x_data, y_data, batch_size=64, nb_epoch=1)
+    name='model_iteration_{}.h5'.format(iteration+1)
+    model.save(os.path.join(base, name))
+
 
 def predict(word):
     processed_word = np.zeros((1, maxlen, len(char_pool)))
@@ -111,9 +125,6 @@ word_list = [
 
 for word in word_list:
     prediction = predict(word)
-    print(f"{word}:\t"
-          f"TUR: {prediction['tur']:.2f}\t"
-          f"ENG: {prediction['eng']:.2f}")
+    print('%s\t\tTUR:%.2f\tENG:%.2f'%(word, prediction['tur'], prediction['eng']))
 
-print(f"Overall Accuracy: {correct_count}/500 "
-      f"({correct_count/5})")
+print("Overall Accuracy: %.2f/500 "%(correct_count))
